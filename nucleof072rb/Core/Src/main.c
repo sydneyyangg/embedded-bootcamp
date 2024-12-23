@@ -19,17 +19,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -50,7 +50,6 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -65,6 +64,15 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+TIM_HandleTypeDef htim1;
+SPI_HandleTypeDef hspi1;
+
+  uint8_t RxData[3]; //array to receive data
+  uint8_t TxData[3] = {1, 128, 0}; //array to transmit data, 00000001 for start bit, 10000000 for SGL and channel select
+  uint16_t size = 3;
+  uint16_t result;
+  uint8_t on_counts;
+
 
   /* USER CODE END 1 */
 
@@ -74,7 +82,6 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -87,7 +94,13 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_TIM_PWM_Init(&htim1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1); //PWM start
+  HAL_SPI_Init (&hspi1);
 
   /* USER CODE END 2 */
 
@@ -95,10 +108,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  HAL_SPI_TransmitReceive (&hspi1, TxData, RxData, size, HAL_MAX_DELAY);
+	  result = ((RxData[1] & 0x03) << 8) | RxData[2];
+
+	  on_counts = (result / 1023) * 3200 + 3200;
+
+	  __HAL_TIM_SET_COMPARE (&htim1, TIM_CHANNEL_1, on_counts);
+
+	  HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
+  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_SET);
   /* USER CODE END 3 */
 }
 
