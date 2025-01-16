@@ -44,6 +44,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+  const uint16_t SIZE = 3;
+  const uint16_t MAX_VALUE = 1023;
+  const uint16_t PERIOD = 64000;
 
 /* USER CODE END PV */
 
@@ -64,12 +67,9 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-TIM_HandleTypeDef htim1;
-SPI_HandleTypeDef hspi1;
 
-  uint8_t RxData[3]; //array to receive data
-  uint8_t TxData[3] = {1, 128, 0}; //array to transmit data, 00000001 for start bit, 10000000 for SGL and channel select
-  uint16_t size = 3;
+  uint8_t RxData[SIZE]; //array to receive data
+  uint8_t TxData[SIZE] = {0x1, 0x80, 0x0}; //array to transmit data, 00000001 for start bit, 10000000 for Single not diff and channel select
   uint16_t result;
   uint8_t on_counts;
 
@@ -96,11 +96,8 @@ SPI_HandleTypeDef hspi1;
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
+
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_TIM_PWM_Init(&htim1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1); //PWM start
-  HAL_SPI_Init (&hspi1);
 
   /* USER CODE END 2 */
 
@@ -108,19 +105,23 @@ SPI_HandleTypeDef hspi1;
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_SPI_TransmitReceive (&hspi1, TxData, RxData, size, HAL_MAX_DELAY);
-	  result = ((RxData[1] & 0x03) << 8) | RxData[2];
+	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_RESET); // make pin 8 low on the GPIO because thats how u initiate comms
 
-	  on_counts = (result / 1023) * 3200 + 3200;
+	  HAL_SPI_TransmitReceive (&hspi1, TxData, RxData, SIZE, HAL_MAX_DELAY); //simultaneously sends out the control bits to indicate CH0 channel selection, and receives all the digital data
+	  result = ((RxData[1] & 0x03) << 8) | RxData[2]; // extracts meaningful data, uses second byte and ANDs them to get only the last two digits, then adds 8 digits, then appends the third byte
+
+	  on_counts = (result / MAX_VALUE) * 0.05 * PERIOD + 0.05 * PERIOD; //convert  to on counts
 
 	  __HAL_TIM_SET_COMPARE (&htim1, TIM_CHANNEL_1, on_counts);
+
+	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_SET); //back to high to end comms
+
 
 	  HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
-  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_SET);
   /* USER CODE END 3 */
 }
 
