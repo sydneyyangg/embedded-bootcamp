@@ -69,7 +69,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   uint8_t RxData[SIZE]; //array to receive data
-  uint8_t TxData[SIZE] = {0x1, 0x80, 0x0}; //array to transmit data, 00000001 for start bit, 10000000 for Single not diff and channel select
+  uint8_t TxData[SIZE] = {0x1, 0x80, 0x0}; // array to transmit data (start bit and configure bits)
   uint16_t result;
   uint8_t on_counts;
 
@@ -105,16 +105,15 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_RESET); // make pin 8 low on the GPIO because thats how u initiate comms
+	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_RESET); // pull CS line low to initiate communication
+	  HAL_SPI_TransmitReceive (&hspi1, TxData, RxData, SIZE, HAL_MAX_DELAY); // transmits control bits for CH0, receives digital data
+	  result = ((RxData[1] & 0x03) << 8) | RxData[2]; // extracts meaningful data
 
-	  HAL_SPI_TransmitReceive (&hspi1, TxData, RxData, SIZE, HAL_MAX_DELAY); //simultaneously sends out the control bits to indicate CH0 channel selection, and receives all the digital data
-	  result = ((RxData[1] & 0x03) << 8) | RxData[2]; // extracts meaningful data, uses second byte and ANDs them to get only the last two digits, then adds 8 digits, then appends the third byte
-
-	  on_counts = (result / MAX_VALUE) * 0.05 * PERIOD + 0.05 * PERIOD; //convert  to on counts
+	  on_counts = (result / MAX_VALUE) * 0.05 * PERIOD + 0.05 * PERIOD; //convert digital value to on counts of PWM
 
 	  __HAL_TIM_SET_COMPARE (&htim1, TIM_CHANNEL_1, on_counts);
 
-	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_SET); //back to high to end comms
+	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8, GPIO_PIN_SET); // pull CS line high to end communication
 
 
 	  HAL_Delay(10);
